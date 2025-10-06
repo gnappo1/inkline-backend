@@ -10,7 +10,23 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_09_29_235459) do
+ActiveRecord::Schema[8.0].define(version: 2025_10_06_234149) do
+  create_table "categories", force: :cascade do |t|
+    t.string "name", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index "LOWER(name)", name: "index_categories_on_lower_name", unique: true
+    t.index ["name"], name: "index_categories_on_name"
+  end
+
+  create_table "categories_notes", id: false, force: :cascade do |t|
+    t.integer "category_id", null: false
+    t.integer "note_id", null: false
+    t.index ["category_id", "note_id"], name: "index_categories_notes_on_category_id_and_note_id"
+    t.index ["category_id", "note_id"], name: "index_categories_notes_unique", unique: true
+    t.index ["note_id", "category_id"], name: "index_categories_notes_on_note_id_and_category_id"
+  end
+
   create_table "friendships", force: :cascade do |t|
     t.integer "sender_id", null: false
     t.integer "receiver_id", null: false
@@ -48,6 +64,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_29_235459) do
     t.index ["email"], name: "index_users_on_email", unique: true
   end
 
+  add_foreign_key "categories_notes", "categories", on_delete: :cascade
+  add_foreign_key "categories_notes", "notes", on_delete: :cascade
   add_foreign_key "friendships", "users", column: "receiver_id", on_delete: :cascade
   add_foreign_key "friendships", "users", column: "sender_id", on_delete: :cascade
   add_foreign_key "notes", "users", on_delete: :cascade

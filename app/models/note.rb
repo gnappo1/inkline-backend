@@ -1,7 +1,8 @@
 # app/models/note.rb
 class Note < ApplicationRecord
   belongs_to :user, inverse_of: :notes
-
+  has_and_belongs_to_many :categories
+  
   validates :title, presence: true, length: { in: 1..50 }
   validates :body,  presence: true, length: { maximum: 1000 }
   validate  :title_does_not_contain_taboo_words

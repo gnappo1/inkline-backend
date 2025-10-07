@@ -1,8 +1,7 @@
 class UsersController < ApplicationController
   before_action :bounce_clients, only: [:index]
-  before_action :bounce_if_not_logged_in, only: [:show, :update, :destroy]
+  before_action :bounce_if_not_logged_in, only: [:show, :update, :destroy, :friends]
   before_action :find_user, only: [:show, :update, :destroy]
-  before_action :bounce_if_not_logged_in, only: [:friends]
 
   DEFAULT_LIMIT = 20
 
@@ -15,7 +14,6 @@ class UsersController < ApplicationController
                     .includes(:sender, :receiver)
                     .order(created_at: :desc, id: :desc)
 
-    # keyset cursors
     if params[:before].present?
       ts, fid = decode_cursor(params[:before])
       rel = rel.where("created_at < ? OR (created_at = ? AND id < ?)", ts, ts, fid)
@@ -28,38 +26,33 @@ class UsersController < ApplicationController
     rows = rel.limit(limit).to_a
     rows.reverse! if params[:after].present?
 
-    # emit the "other" user for each friendship
-    payload = rows.map do |fr|
-      other = (fr.sender_id == @current_user.id) ? fr.receiver : fr.sender
-      {
-        friendship_id: fr.id,
-        friended_at: fr.created_at,
-        friend: {
-          id: other.id,
-          first_name: other.first_name,
-          last_name:  other.last_name
-          # add :avatar_url when you have it
-        }
-      }
-    end
+    meta = {
+      next_cursor: rows.last && encode_cursor(rows.last),
+      prev_cursor: rows.first && encode_cursor(rows.first)
+    }
 
-    render json: {
-      data: payload,
-      next_cursor: rows.last && encode_cursor(rows.last),   # use as ?before=
-      prev_cursor: rows.first && encode_cursor(rows.first)  # use as ?after=
-    }, status: 200
+    # Include both ends; client knows current user and can display the "other".
+    fields = { users: %i[first_name last_name] }
+
+    render_jsonapi(
+      rows,
+      serializer: FriendshipSerializer,
+      include: [:sender, :receiver],
+      fields: fields,
+      meta: meta
+    )
   end
-  
+
   def index
-    render json: User.order(created_at: :desc, id: :desc), status: 200
+    render_jsonapi(User.order(created_at: :desc, id: :desc), serializer: UserSerializer)
   end
 
   def show
-    render json: {msg: "Could not find user with id ##{params[:id]}"}, status: 404 unless @user
+    return render json: { msg: "Could not find user with id ##{params[:id]}" }, status: 404 unless @user
     unless @current_user.admin? || @current_user.superadmin? || @current_user.id == @user.id
       return render json: { error: "Unauthorized" }, status: 403
     end
-    render json: @user, status: 200
+    render_jsonapi(@user, serializer: UserSerializer, status: 200)
   end
 
   def update
@@ -67,8 +60,9 @@ class UsersController < ApplicationController
     unless @current_user.admin? || @current_user.superadmin? || @current_user.id == @user.id
       return render json: { error: "Unauthorized" }, status: 403
     end
+
     if @user.update(user_params)
-      render json: @user, status: 202
+      render_jsonapi(@user, serializer: UserSerializer, status: 202)
     else
       render json: { errors: @user.errors }, status: 400
     end
@@ -92,5 +86,14 @@ class UsersController < ApplicationController
 
   def find_user
     @user = User.find_by(id: params[:id])
+  end
+
+  def encode_cursor(fr)
+    Base64.urlsafe_encode64("#{fr.created_at.utc.iso8601},#{fr.id}")
+  end
+
+  def decode_cursor(str)
+    ts_s, id_s = Base64.urlsafe_decode64(str).split(",", 2)
+    [Time.iso8601(ts_s), Integer(id_s)]
   end
 end

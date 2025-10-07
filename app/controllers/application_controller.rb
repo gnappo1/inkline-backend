@@ -1,5 +1,7 @@
 class ApplicationController < ActionController::API
   include ActionController::Cookies
+  include JsonapiRendering
+
   rescue_from ActiveRecord::RecordInvalid, with: :render_unprocessable
   rescue_from ActiveRecord::RecordNotFound, with: :render_not_found
   rescue_from ActiveRecord::RecordNotUnique, with: :render_conflict

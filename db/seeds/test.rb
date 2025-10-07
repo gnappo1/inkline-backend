@@ -1,13 +1,3 @@
-# This file should ensure the existence of records required to run the application in every environment (production,
-# development, test). The code here should be idempotent so that it can be executed at any point in every environment.
-# The data can then be loaded with the bin/rails db:seed command (or created alongside the database with db:setup).
-#
-# Example:
-#
-#   ["Action", "Comedy", "Drama", "Horror"].each do |genre_name|
-#     MovieGenre.find_or_create_by!(name: genre_name)
-#   end
-
 require "faker"
 
 abort("Refusing to seed in production") if Rails.env.production?
@@ -16,6 +6,7 @@ puts "Resetting data..."
 # Fast truncate style reset
 Note.delete_all
 User.delete_all
+puts "data reset complete! ✅"
 
 
 puts "Creating users..."
@@ -28,6 +19,7 @@ users = []
     password:   "password"
   )
 end
+puts "user seed complete! ✅"
 
 puts "Creating notes..."
 users.each do |u|
@@ -39,5 +31,36 @@ users.each do |u|
     )
   end
 end
+puts "note seed complete! ✅"
+
+puts "staggering timestamps for notes due to mass insertion"
+Note.publicly_accessible.order(id: :desc).each_with_index do |n, i|
+  ts = Time.current - i.seconds
+  n.update_columns(created_at: ts, updated_at: ts)
+end
+puts "note timestamp staggering complete! ✅"
+
+puts "creating categories..."
+categories_data = %w[
+  Productivity Ideas Journal Tech Design Personal Travel Books Finance Wellness
+  Programming Writing Learning Inspiration Research Music Movies Food Fitness
+]
+
+# idempotent upserts for categories
+categories = categories_data.map do |name|
+  Category.where(name: name).first_or_create!
+end
+puts "category seed complete! ✅"
+
+puts "Assigning categories to notes…"
+# Attach 1–4 random categories to each public note
+Note.find_each do |n|
+  # pick 1..4 unique categories
+  picks = categories.sample(rand(1..4))
+  # replace existing (idempotent)
+  n.categories = picks
+  n.save!  # will validate Note again, which is fine here
+end
+puts "Categories seeded and attached."
 
 puts "Done."

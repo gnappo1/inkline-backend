@@ -9,5 +9,16 @@ class Note < ApplicationRecord
   scope :recent, -> { order(created_at: :desc).limit(20) }
   scope :by_user, -> (user_id) { where(user_id: user_id) }
   scope :publicly_accessible, -> { where(public: true) }
+  scope :feed_order, -> { order(created_at: :desc, id: :desc) }
+
+  scope :before_cursor, ->(ts, id) {
+    where("created_at < ? OR (created_at = ? AND id < ?)", ts, ts, id)
+  }
+  
+  scope :after_cursor, ->(ts, id) {
+    where("created_at > ? OR (created_at = ? AND id > ?)", ts, ts, id)
+  }
+
+  scope :with_owner, -> { includes(:user) }
 
 end

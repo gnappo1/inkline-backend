@@ -6,7 +6,7 @@ class SessionsController < ApplicationController
     user = User.find_by(email: user_params[:email])
     if user&.authenticate(user_params[:password])
       session["user_id"] = user.id
-      render json: user, status: 200
+      render_jsonapi(@current_user, serializer: UserSerializer)
     else
       render json: {msg: "Invalid Credentials"}, status: 400
     end
@@ -16,7 +16,7 @@ class SessionsController < ApplicationController
     user = User.new(user_params)
     if user.save
       session["user_id"] = user.id
-      render json: user, status: 201
+      render_jsonapi(@current_user, serializer: UserSerializer, status: 201)
     else
       render json: {msg: user.errors}, status: 400
     end
@@ -28,7 +28,7 @@ class SessionsController < ApplicationController
   end
 
   def current_user
-    render json: @current_user, status: 200
+    render_jsonapi(@current_user, serializer: UserSerializer)
   end
 
   private

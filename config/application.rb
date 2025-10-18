@@ -6,7 +6,7 @@ require "rails/all"
 # you've limited to :test, :development, or :production.
 Bundler.require(*Rails.groups)
 
-module NotesApi
+module InklineApi
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.
     config.load_defaults 8.0
@@ -16,7 +16,7 @@ module NotesApi
     # Common ones are `templates`, `generators`, or `middleware`, for example.
     config.autoload_lib(ignore: %w[assets tasks])
     config.middleware.use ActionDispatch::Cookies
-    config.middleware.use ActionDispatch::Session::CookieStore, key: "_notes_api_session", same_site: :lax
+    config.middleware.use ActionDispatch::Session::CookieStore, key: "_inkline_api_session", same_site: :lax
 
     # Configuration for the application, engines, and railties goes here.
     #

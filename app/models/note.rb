@@ -1,4 +1,3 @@
-# app/models/note.rb
 class Note < ApplicationRecord
   belongs_to :user, inverse_of: :notes
   has_and_belongs_to_many :categories

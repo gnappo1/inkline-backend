@@ -1,4 +1,3 @@
-# app/models/user.rb
 class User < ApplicationRecord
   include Normalizers::Email
   has_many :notes, dependent: :destroy, inverse_of: :user
@@ -87,22 +86,25 @@ class User < ApplicationRecord
       raise "Not pending" unless fr.pending?
       fr.update!(status: :accepted)
 
-    when :decline
+    when :reject
       raise "Only receiver can decline" unless fr.receiver_id == id
       raise "Not pending" unless fr.pending?
-      fr.update!(status: :declined)
+      fr.destroy!
 
     when :cancel
       raise "Only sender can cancel" unless fr.sender_id == id
       raise "Not pending" unless fr.pending?
-      # choose one:
-      fr.update!(status: :canceled)   # keep history
-      # fr.destroy!                    # or hard delete
+      fr.destroy!
 
     when :unfriend
       raise "Only accepted friendships can be removed" unless fr.accepted?
       raise "Not a participant" unless [fr.sender_id, fr.receiver_id].include?(id)
       fr.destroy!
+
+    when :block
+      raise "Only accepted friends can be blocked" unless fr.accepted?
+      raise "Not a participant" unless [fr.sender_id, fr.receiver_id].include?(id)
+      fr.update!(status: "blocked", sender_id: id, receiver_id: other_user_id)
 
     else
       raise ArgumentError, "Unknown action: #{action}"

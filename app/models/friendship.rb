@@ -3,7 +3,7 @@ class Friendship < ApplicationRecord
   belongs_to :receiver, class_name: "User"
 
   enum :status,
-      {pending: "pending", accepted: "accepted", rejected: "rejected", canceled: "canceled", blocked: "blocked"},
+      {pending: "pending", accepted: "accepted", blocked: "blocked"},
       validate: true
   
   validates :sender_id, :receiver_id, presence: true

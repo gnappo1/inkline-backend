@@ -10,30 +10,33 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_10_06_234149) do
+ActiveRecord::Schema[8.0].define(version: 2025_10_16_063201) do
+  # These are extensions that must be enabled in order to support this database
+  enable_extension "pg_catalog.plpgsql"
+
   create_table "categories", force: :cascade do |t|
     t.string "name", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index "LOWER(name)", name: "index_categories_on_lower_name", unique: true
+    t.index "lower((name)::text)", name: "index_categories_on_lower_name", unique: true
     t.index ["name"], name: "index_categories_on_name"
   end
 
   create_table "categories_notes", id: false, force: :cascade do |t|
-    t.integer "category_id", null: false
-    t.integer "note_id", null: false
+    t.bigint "category_id", null: false
+    t.bigint "note_id", null: false
     t.index ["category_id", "note_id"], name: "index_categories_notes_on_category_id_and_note_id"
     t.index ["category_id", "note_id"], name: "index_categories_notes_unique", unique: true
     t.index ["note_id", "category_id"], name: "index_categories_notes_on_note_id_and_category_id"
   end
 
   create_table "friendships", force: :cascade do |t|
-    t.integer "sender_id", null: false
-    t.integer "receiver_id", null: false
+    t.bigint "sender_id", null: false
+    t.bigint "receiver_id", null: false
     t.string "status", default: "pending", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index "CASE WHEN sender_id < receiver_id THEN sender_id ELSE receiver_id END, CASE WHEN sender_id < receiver_id THEN receiver_id ELSE sender_id END", name: "idx_friendships_unique_pair", unique: true
+    t.index "LEAST(sender_id, receiver_id), GREATEST(sender_id, receiver_id)", name: "idx_friendships_unique_pair", unique: true
     t.index ["receiver_id", "status"], name: "index_friendships_on_receiver_id_and_status"
     t.index ["receiver_id"], name: "index_friendships_on_receiver_id"
     t.index ["sender_id", "status"], name: "index_friendships_on_sender_id_and_status"
@@ -44,11 +47,12 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_06_234149) do
   create_table "notes", force: :cascade do |t|
     t.string "title", null: false
     t.text "body", null: false
-    t.integer "user_id", null: false
+    t.bigint "user_id", null: false
     t.boolean "public", default: true
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["user_id", "created_at"], name: "index_notes_on_user_id_and_created_at"
+    t.index ["created_at", "id"], name: "index_notes_on_created_at_id"
+    t.index ["user_id", "created_at"], name: "index_notes_on_user_id_created_at"
     t.index ["user_id"], name: "index_notes_on_user_id"
   end
 
@@ -60,8 +64,9 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_06_234149) do
     t.string "role", default: "client"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index "lower(email)", name: "index_users_on_lower_email", unique: true
-    t.index ["email"], name: "index_users_on_email", unique: true
+    t.index "lower((email)::text)", name: "index_users_on_lower_email", unique: true
+    t.index "lower((first_name)::text)", name: "index_users_on_lower_first_name"
+    t.index "lower((last_name)::text)", name: "index_users_on_lower_last_name"
   end
 
   add_foreign_key "categories_notes", "categories", on_delete: :cascade

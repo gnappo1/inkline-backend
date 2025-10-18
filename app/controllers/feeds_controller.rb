@@ -8,6 +8,24 @@ class FeedsController < ApplicationController
                 .feed_order
                 .includes(:user, :categories)
 
+    if params[:user_id].present?
+      notes = notes.where(user_id: params[:user_id].to_i)
+    end
+
+    blocked_ids = Friendship.where(status: :blocked)
+                            .where("sender_id = :me OR receiver_id = :me", me: current_user_id)
+                            .pluck(:sender_id, :receiver_id)
+                            .flat_map { |a, b| [a, b] }
+                            .uniq
+                            .reject { |id| id == current_user_id }
+
+                            notes = notes.where.not(user_id: blocked_ids) if blocked_ids.any?
+
+    if params[:q].present?
+      q = "%#{params[:q].to_s.strip.downcase}%"
+      notes = notes.where("LOWER(title) LIKE :q OR LOWER(body) LIKE :q", q: q)
+    end
+
     if params[:before].present?
       ts, id = decode_cursor(params[:before])
       notes  = notes.before_cursor(ts, id)
@@ -22,7 +40,7 @@ class FeedsController < ApplicationController
     render_jsonapi(
       notes,
       serializer: NoteSerializer,
-      include: [], # we don't need side-loaded resources with flattened attrs
+      include: [],
       meta: {
         next_cursor: next_cursor_for(notes),
         prev_cursor: prev_cursor_for(notes)
@@ -32,6 +50,10 @@ class FeedsController < ApplicationController
   end
 
   private
+
+  def current_user_id
+    session && session[:user_id]
+  end
 
   def encode_cursor(note)
     Base64.urlsafe_encode64("#{note.created_at.utc.iso8601(6)},#{note.id}")

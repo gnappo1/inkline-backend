@@ -1,4 +1,3 @@
-# app/lib/filters/profanity.rb
 module Filters
   module Profanity
     module_function
@@ -24,17 +23,14 @@ module Filters
       /(#{body})/i
     end
 
-    # normalize to compare apples-to-apples
     def base(text)
       text.to_s.downcase.tr(LEET.keys.join, LEET.values.join)
     end
 
-    # punctuation → spaces (for whole-word)
     def with_spaces(text)
       base(text).gsub(/[^\p{Alnum}]+/, " ").squeeze(" ").strip
     end
 
-    # punctuation removed (for stems like f.u.c.k → fuck)
     def joined(text)
       base(text).gsub(/[^\p{Alnum}]+/, "")
     end

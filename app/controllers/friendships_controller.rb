@@ -1,10 +1,8 @@
-# app/controllers/friendships_controller.rb
 class FriendshipsController < ApplicationController
   before_action :bounce_if_not_logged_in
 
   DEFAULT_LIMIT = 20
 
-  # GET /friendships?limit=20&before=<cursor>&after=<cursor>
   def index
     limit = params.fetch(:limit, DEFAULT_LIMIT).to_i.clamp(1, 100)
 
@@ -26,18 +24,14 @@ class FriendshipsController < ApplicationController
     rows.reverse! if params[:after].present?
 
     meta = {
-      next_cursor: rows.last && encode_cursor(rows.last),   # use as ?before=
-      prev_cursor: rows.first && encode_cursor(rows.first)  # use as ?after=
+      next_cursor: rows.last && encode_cursor(rows.last),
+      prev_cursor: rows.first && encode_cursor(rows.first)
     }
-
-    # Include both ends, but ship *only* names to keep it tiny.
-    fields = { users: %i[first_name last_name] }
 
     render_jsonapi(
       rows,
       serializer: FriendshipSerializer,
-      include: [:sender, :receiver],
-      fields: fields,
+      fields: { users: %i[id first_name last_name] },
       meta: meta
     )
   end
@@ -45,10 +39,10 @@ class FriendshipsController < ApplicationController
   def create
     receiver_id = params.require(:receiver_id).to_i
     return render json: { error: "You cannot befriend yourself" }, status: 422 if @current_user.id == receiver_id
-    return render json: { error: "User not found" }, status: 404 unless User.exists?(id: receiver_id)
+    return render json: { error: "User not found" }, status: 404 unless User.exists?(receiver_id)
 
     me = @current_user.id
-    fr = nil
+    fr  = nil
 
     Friendship.transaction do
       fr = Friendship.between(me, receiver_id).lock(true).first
@@ -57,49 +51,56 @@ class FriendshipsController < ApplicationController
         fr = @current_user.send_friend_request(receiver_id)
       else
         case fr.status
-        when "blocked"
-          return render json: { error: "Blocked" }, status: 403
-
-        when "accepted"
-          return render_jsonapi(fr, serializer: FriendshipSerializer, include: [:sender, :receiver], fields: { users: %i[first_name last_name] }, status: 200)
-
+        when "blocked"   then return render json: { error: "Blocked" }, status: 403
+        when "accepted"  then return render_jsonapi(fr, serializer: FriendshipSerializer, include: [:sender, :receiver], fields: { users: %i[first_name last_name] }, status: 200)
         when "pending"
-          if fr.sender_id == me
-            return render_jsonapi(fr, serializer: FriendshipSerializer, include: [:sender, :receiver], fields: { users: %i[first_name last_name] }, status: 200)
-          elsif fr.receiver_id == me
-            fr.update!(status: :accepted) # auto-accept mirror request
-            return render_jsonapi(fr, serializer: FriendshipSerializer, include: [:sender, :receiver], fields: { users: %i[first_name last_name] }, status: 200)
+          if fr.receiver_id == me
+            fr.update!(status: :accepted)
           end
-
+          return render_jsonapi(fr, serializer: FriendshipSerializer, status: 200)
         when "declined", "canceled"
           fr.update!(status: :pending, sender_id: me, receiver_id: receiver_id)
           return render_jsonapi(fr, serializer: FriendshipSerializer, include: [:sender, :receiver], fields: { users: %i[first_name last_name] }, status: 200)
         end
       end
     end
-
-    render_jsonapi(fr, serializer: FriendshipSerializer, include: [:sender, :receiver], fields: { users: %i[first_name last_name] }, status: 201)
+    
+    render_jsonapi(fr, serializer: FriendshipSerializer, status: 201)
   rescue ActiveRecord::RecordNotUnique
-    fr = Friendship.between(me, receiver_id).first
-    render_jsonapi(fr, serializer: FriendshipSerializer, include: [:sender, :receiver], fields: { users: %i[first_name last_name] }, status: 200)
+    fr = Friendship.between(@current_user.id, receiver_id).first
+    render_jsonapi(fr, serializer: FriendshipSerializer, status: 200)
   end
 
   def update
-    fr = Friendship.find_by(id: params[:id])
-    return render json: { error: "Not found" }, status: 404 unless fr
+    fr = Friendship.find_by(id: params[:id]) or return render json: { error: "Not found" }, status: 404
     return render json: { error: "Unauthorized" }, status: 403 unless participant?(fr, @current_user.id)
 
-    other_id = other_party_id(fr, @current_user.id)
-    op = params.require(:op).to_s # avoid clashing with Rails' internal :action
-    return render json: { error: "Unsupported action" }, status: 422 unless %w[accept reject].include?(op)
+    op = params.require(:op).to_s
+    return render json: { error: "Unsupported action" }, status: 422 unless %w[accept reject block unblock].include?(op)
 
-    fr = @current_user.respond_to_friendship!(other_id, op)
-    render_jsonapi(fr, serializer: FriendshipSerializer, include: [:sender, :receiver], fields: { users: %i[first_name last_name] }, status: 200)
+    other_id = other_party_id(fr, @current_user.id)
+
+    case op
+    when "accept"
+      fr = @current_user.respond_to_friendship!(other_id, :accept)
+      return render_jsonapi(fr, serializer: FriendshipSerializer, status: 200)
+    
+    when "reject"
+      @current_user.respond_to_friendship!(other_id, :reject)
+      return head 204
+
+    when "block"
+      fr = @current_user.respond_to_friendship!(other_id, :block)
+      render_jsonapi(fr, serializer: FriendshipSerializer, status: 200)
+
+    when "unblock"
+      fr.destroy!
+      head 204
+    end
   end
 
   def destroy
-    fr = Friendship.find_by(id: params[:id])
-    return render json: { error: "Not found" }, status: 404 unless fr
+    fr = Friendship.find_by(id: params[:id]) or return render json: { error: "Not found" }, status: 404
     return render json: { error: "Unauthorized" }, status: 403 unless participant?(fr, @current_user.id)
 
     other_id = other_party_id(fr, @current_user.id)
@@ -127,7 +128,6 @@ class FriendshipsController < ApplicationController
     fr.sender_id == me_id ? fr.receiver_id : fr.sender_id
   end
 
-  # same encode/decode you already have...
   def encode_cursor(fr)
     Base64.urlsafe_encode64("#{fr.created_at.utc.iso8601},#{fr.id}")
   end

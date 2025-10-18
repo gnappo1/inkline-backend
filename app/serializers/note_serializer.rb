@@ -9,7 +9,6 @@ class NoteSerializer
     u ? { id: u.id, first_name: u.first_name, last_name: u.last_name } : nil
   end
 
-  # Categories as array of { id, name }
   attribute :categories do |note|
     note.categories.map { |c| { id: c.id, name: c.name } }
   end

@@ -62,4 +62,43 @@ Note.find_each do |n|
 end
 puts "Categories seeded and attached."
 
+
+puts "Making friendships…"
+
+DENSITY = 0.50 # 50% of pairs will get *some* relationship
+
+users.each_with_index do |user, i|
+  users.drop(i + 1).each do |other|
+    next if rand > DENSITY
+    next if Friendship.between(user.id, other.id).exists?
+
+    status = %i[accepted pending blocked].sample
+
+    case status
+    when :accepted
+      Friendship.create!(sender: user, receiver: other, status: :accepted)
+
+    when :pending
+      if [true, false].sample
+        Friendship.create!(sender: user,  receiver: other, status: :pending)
+      else
+        Friendship.create!(sender: other, receiver: user,  status: :pending)
+      end
+
+    when :blocked
+      if [true, false].sample
+        Friendship.create!(sender: user,  receiver: other, status: :blocked)
+      else
+        Friendship.create!(sender: other, receiver: user,  status: :blocked)
+      end
+    end
+
+  rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique 
+    # race/constraint safe in case of parallel seeds or retries
+    binding.pry
+  end
+end
+
+puts "friendship seed complete! ✅"
+
 puts "Done."

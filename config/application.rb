@@ -16,12 +16,7 @@ module InklineApi
     # Common ones are `templates`, `generators`, or `middleware`, for example.
     config.autoload_lib(ignore: %w[assets tasks])
     config.middleware.use ActionDispatch::Cookies
-    config.middleware.use ActionDispatch::Session::CookieStore,
-      key: '_inkline_api_session',
-    domain: (ENV['SESSION_COOKIE_DOMAIN'].presence || :nil),                                    # <- works for subdomains
-    tld_length: 2,                                   # "inkline.live"
-    same_site: :none,                                 # now same-site with subdomains
-    secure: Rails.env.production?
+    config.middleware.use ActionDispatch::Session::CookieStore
     # Configuration for the application, engines, and railties goes here.
     #
     # These settings can be overridden in specific environments using the files

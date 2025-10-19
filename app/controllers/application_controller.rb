@@ -1,7 +1,6 @@
 class ApplicationController < ActionController::API
   include ActionController::Cookies
   include JsonapiRendering
-  protect_from_forgery with: :null_session
 
   rescue_from ActiveRecord::RecordInvalid, with: :render_unprocessable
   rescue_from ActiveRecord::RecordNotFound, with: :render_not_found

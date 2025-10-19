@@ -12,6 +12,7 @@ Rails.application.routes.draw do
   get "/me/friends", to: "users#my_friends"
   patch "/profile/update", to: "users#update"
   get "/feed/public", to: "feeds#public_notes"
-  get "up" => "rails/health#show", as: :rails_health_check
-
+  
+  get "up", to: "health#show", as: :rails_health_check
+  root to: "health#show"
 end
